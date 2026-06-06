@@ -1,0 +1,286 @@
+import type { User, Stall, InspectionRecord, ViolationRecord, WeighingRecord, Warning, DashboardStats, MonthlyReport } from '@/types';
+
+export const mockUsers: User[] = [
+  {
+    id: 'user-001',
+    username: 'admin',
+    name: '张管理',
+    role: 'admin',
+  },
+  {
+    id: 'user-002',
+    username: 'inspector',
+    name: '李巡检',
+    role: 'inspector',
+  },
+  {
+    id: 'user-003',
+    username: 'analyst',
+    name: '王分析',
+    role: 'analyst',
+  },
+];
+
+export const mockStalls: Stall[] = [
+  { id: 'stall-001', name: 'A01-新鲜果蔬', location: 'A区01号', ownerName: '陈老板', phone: '138****1234', category: '蔬菜', createdAt: '2024-01-01' },
+  { id: 'stall-002', name: 'A02-绿叶蔬菜', location: 'A区02号', ownerName: '刘大姐', phone: '139****5678', category: '蔬菜', createdAt: '2024-01-02' },
+  { id: 'stall-003', name: 'B01-精品水果', location: 'B区01号', ownerName: '王大哥', phone: '137****9012', category: '水果', createdAt: '2024-01-03' },
+  { id: 'stall-004', name: 'B02-热带水果', location: 'B区02号', ownerName: '赵师傅', phone: '136****3456', category: '水果', createdAt: '2024-01-04' },
+  { id: 'stall-005', name: 'C01-有机蔬菜', location: 'C区01号', ownerName: '孙阿姨', phone: '135****7890', category: '蔬菜', createdAt: '2024-01-05' },
+  { id: 'stall-006', name: 'C02-进口水果', location: 'C区02号', ownerName: '周老板', phone: '134****2345', category: '水果', createdAt: '2024-01-06' },
+];
+
+export const mockInspections: InspectionRecord[] = [
+  {
+    id: 'insp-001',
+    stallId: 'stall-001',
+    stallName: 'A01-新鲜果蔬',
+    inspectorId: 'user-002',
+    inspectorName: '李巡检',
+    inspectionTime: '2024-06-05 09:30:00',
+    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=fresh%20vegetables%20tomatoes%20cucumbers%20market%20stall&image_size=square',
+    recognitionResult: { category: 'tomato', categoryName: '番茄', freshness: 'fresh', confidence: 0.95 },
+  },
+  {
+    id: 'insp-002',
+    stallId: 'stall-003',
+    stallName: 'B01-精品水果',
+    inspectorId: 'user-002',
+    inspectorName: '李巡检',
+    inspectionTime: '2024-06-05 10:15:00',
+    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=rotten%20apples%20spoiled%20fruit%20market%20stall&image_size=square',
+    recognitionResult: { category: 'apple', categoryName: '苹果', freshness: 'rotten', confidence: 0.89 },
+  },
+  {
+    id: 'insp-003',
+    stallId: 'stall-002',
+    stallName: 'A02-绿叶蔬菜',
+    inspectorId: 'user-002',
+    inspectorName: '李巡检',
+    inspectionTime: '2024-06-05 11:00:00',
+    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=spinach%20lettuce%20green%20leaf%20vegetables%20fresh&image_size=square',
+    recognitionResult: { category: 'spinach', categoryName: '菠菜', freshness: 'normal', confidence: 0.82 },
+  },
+  {
+    id: 'insp-004',
+    stallId: 'stall-004',
+    stallName: 'B02-热带水果',
+    inspectorId: 'user-002',
+    inspectorName: '李巡检',
+    inspectionTime: '2024-06-04 14:30:00',
+    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=bananas%20mangoes%20tropical%20fruits%20market&image_size=square',
+    recognitionResult: { category: 'banana', categoryName: '香蕉', freshness: 'fresh', confidence: 0.91 },
+  },
+  {
+    id: 'insp-005',
+    stallId: 'stall-005',
+    stallName: 'C01-有机蔬菜',
+    inspectorId: 'user-002',
+    inspectorName: '李巡检',
+    inspectionTime: '2024-06-04 15:45:00',
+    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=organic%20carrots%20vegetables%20fresh%20market&image_size=square',
+    recognitionResult: { category: 'carrot', categoryName: '胡萝卜', freshness: 'rotten', confidence: 0.87 },
+  },
+];
+
+export const mockViolations: ViolationRecord[] = [
+  {
+    id: 'viol-001',
+    inspectionId: 'insp-002',
+    stallId: 'stall-003',
+    stallName: 'B01-精品水果',
+    violationType: 'rotten',
+    status: 'pending',
+    createdAt: '2024-06-05 10:15:00',
+    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=rotten%20apples%20spoiled%20fruit%20market%20stall&image_size=square',
+  },
+  {
+    id: 'viol-002',
+    inspectionId: 'insp-005',
+    stallId: 'stall-005',
+    stallName: 'C01-有机蔬菜',
+    violationType: 'rotten',
+    status: 'processing',
+    createdAt: '2024-06-04 15:45:00',
+    handledAt: '2024-06-04 16:30:00',
+    remark: '已责令下架处理',
+    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=organic%20carrots%20vegetables%20fresh%20market&image_size=square',
+  },
+  {
+    id: 'viol-003',
+    stallId: 'stall-001',
+    stallName: 'A01-新鲜果蔬',
+    violationType: 'underweight',
+    status: 'resolved',
+    createdAt: '2024-06-03 09:20:00',
+    handledAt: '2024-06-03 10:00:00',
+    remark: '已批评教育并罚款50元',
+  },
+  {
+    id: 'viol-004',
+    stallId: 'stall-006',
+    stallName: 'C02-进口水果',
+    violationType: 'rotten',
+    status: 'pending',
+    createdAt: '2024-06-05 08:30:00',
+    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=rotten%20imported%20fruits%20market%20stall&image_size=square',
+  },
+  {
+    id: 'viol-005',
+    stallId: 'stall-002',
+    stallName: 'A02-绿叶蔬菜',
+    violationType: 'other',
+    status: 'resolved',
+    createdAt: '2024-06-02 11:00:00',
+    handledAt: '2024-06-02 12:00:00',
+    remark: '摊位卫生不达标，已整改',
+  },
+];
+
+export const mockWeighings: WeighingRecord[] = [
+  {
+    id: 'weigh-001',
+    stallId: 'stall-001',
+    stallName: 'A01-新鲜果蔬',
+    inspectorId: 'user-002',
+    recognizedWeight: 0.92,
+    standardWeight: 1.0,
+    errorRate: -8.0,
+    isViolation: true,
+    recordTime: '2024-06-03 09:20:00',
+  },
+  {
+    id: 'weigh-002',
+    stallId: 'stall-003',
+    stallName: 'B01-精品水果',
+    inspectorId: 'user-002',
+    recognizedWeight: 0.98,
+    standardWeight: 1.0,
+    errorRate: -2.0,
+    isViolation: false,
+    recordTime: '2024-06-05 10:20:00',
+  },
+  {
+    id: 'weigh-003',
+    stallId: 'stall-002',
+    stallName: 'A02-绿叶蔬菜',
+    inspectorId: 'user-002',
+    recognizedWeight: 1.01,
+    standardWeight: 1.0,
+    errorRate: 1.0,
+    isViolation: false,
+    recordTime: '2024-06-05 11:05:00',
+  },
+];
+
+export const mockWarnings: Warning[] = [
+  {
+    id: 'warn-001',
+    stallId: 'stall-003',
+    stallName: 'B01-精品水果',
+    warningType: 'high_violation',
+    warningLevel: 'high',
+    violationCount: 5,
+    createdAt: '2024-06-05 10:15:00',
+    isAcknowledged: false,
+  },
+  {
+    id: 'warn-002',
+    stallId: 'stall-005',
+    stallName: 'C01-有机蔬菜',
+    warningType: 'high_violation',
+    warningLevel: 'medium',
+    violationCount: 3,
+    createdAt: '2024-06-04 15:45:00',
+    isAcknowledged: false,
+  },
+  {
+    id: 'warn-003',
+    stallId: 'stall-001',
+    stallName: 'A01-新鲜果蔬',
+    warningType: 'high_loss',
+    warningLevel: 'medium',
+    violationCount: 2,
+    createdAt: '2024-06-03 09:20:00',
+    isAcknowledged: true,
+  },
+  {
+    id: 'warn-004',
+    stallId: 'stall-006',
+    stallName: 'C02-进口水果',
+    warningType: 'high_violation',
+    warningLevel: 'high',
+    violationCount: 4,
+    createdAt: '2024-06-05 08:30:00',
+    isAcknowledged: false,
+  },
+];
+
+export const mockDashboardStats: DashboardStats = {
+  totalInspections: 156,
+  totalViolations: 23,
+  pendingViolations: 8,
+  activeWarnings: 4,
+  inspectionTrend: [
+    { date: '6/1', count: 28 },
+    { date: '6/2', count: 32 },
+    { date: '6/3', count: 29 },
+    { date: '6/4', count: 35 },
+    { date: '6/5', count: 32 },
+  ],
+  violationTypeDistribution: [
+    { type: '腐烂变质', count: 15 },
+    { type: '缺斤短两', count: 5 },
+    { type: '其他违规', count: 3 },
+  ],
+  topViolationStalls: [
+    { name: 'B01-精品水果', count: 5 },
+    { name: 'C02-进口水果', count: 4 },
+    { name: 'C01-有机蔬菜', count: 3 },
+    { name: 'A01-新鲜果蔬', count: 2 },
+  ],
+};
+
+export const mockMonthlyReport: MonthlyReport = {
+  month: '2024年6月',
+  totalInspections: 856,
+  totalViolations: 124,
+  resolvedRate: 89.5,
+  categoryLoss: [
+    { category: '苹果', lossCount: 28 },
+    { category: '香蕉', lossCount: 22 },
+    { category: '番茄', lossCount: 18 },
+    { category: '菠菜', lossCount: 15 },
+    { category: '胡萝卜', lossCount: 12 },
+  ],
+  stallCompliance: [
+    { name: 'A01-新鲜果蔬', complianceRate: 92.5 },
+    { name: 'A02-绿叶蔬菜', complianceRate: 88.3 },
+    { name: 'B01-精品水果', complianceRate: 75.2 },
+    { name: 'B02-热带水果', complianceRate: 94.1 },
+    { name: 'C01-有机蔬菜', complianceRate: 81.7 },
+    { name: 'C02-进口水果', complianceRate: 78.9 },
+  ],
+};
+
+export const vegetableCategories = [
+  { id: 'tomato', name: '番茄' },
+  { id: 'cucumber', name: '黄瓜' },
+  { id: 'spinach', name: '菠菜' },
+  { id: 'lettuce', name: '生菜' },
+  { id: 'carrot', name: '胡萝卜' },
+  { id: 'cabbage', name: '白菜' },
+  { id: 'broccoli', name: '西兰花' },
+  { id: 'pepper', name: '辣椒' },
+];
+
+export const fruitCategories = [
+  { id: 'apple', name: '苹果' },
+  { id: 'banana', name: '香蕉' },
+  { id: 'orange', name: '橙子' },
+  { id: 'grape', name: '葡萄' },
+  { id: 'watermelon', name: '西瓜' },
+  { id: 'strawberry', name: '草莓' },
+  { id: 'mango', name: '芒果' },
+  { id: 'peach', name: '桃子' },
+];
