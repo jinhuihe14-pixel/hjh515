@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import {
   LineChart,
   Line,
@@ -19,47 +20,63 @@ import {
   Clock,
   TrendingUp,
   ChevronRight,
+  CheckCircle,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useInspectionStore } from '@/stores/useInspectionStore';
 import type { ViolationRecord } from '@/types';
 
-const COLORS = ['#22c55e', '#f97316', '#dc2626'];
+const COLORS = ['#dc2626', '#f97316', '#8b5cf6'];
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { dashboardStats, violations } = useInspectionStore();
+
+  const inspections = useInspectionStore((s) => s.inspections);
+  const violations = useInspectionStore((s) => s.violations);
+  const weighings = useInspectionStore((s) => s.weighings);
+  const warnings = useInspectionStore((s) => s.warnings);
+  const getDashboardStats = useInspectionStore((s) => s.getDashboardStats);
+  const getComplianceRate = useInspectionStore((s) => s.getComplianceRate);
+
+  const stats = useMemo(() => {
+    const dashboard = getDashboardStats();
+    const complianceRate = getComplianceRate();
+    return {
+      ...dashboard,
+      complianceRate: parseFloat(complianceRate.toFixed(1)),
+    };
+  }, [inspections, violations, weighings, warnings, getDashboardStats, getComplianceRate]);
 
   const recentViolations: ViolationRecord[] = violations.slice(0, 5);
 
-  const stats = [
+  const statCards = [
     {
-      label: '今日巡检',
-      value: dashboardStats.totalInspections,
+      label: '巡检总数',
+      value: stats.totalInspections,
       icon: Camera,
       color: 'bg-primary-500',
       bgColor: 'bg-primary-50',
     },
     {
       label: '违规总数',
-      value: dashboardStats.totalViolations,
+      value: stats.totalViolations,
       icon: FileText,
       color: 'bg-orange-500',
       bgColor: 'bg-orange-50',
     },
     {
+      label: '合规率',
+      value: `${stats.complianceRate}%`,
+      icon: CheckCircle,
+      color: 'bg-green-500',
+      bgColor: 'bg-green-50',
+    },
+    {
       label: '待处理违规',
-      value: dashboardStats.pendingViolations,
+      value: stats.pendingViolations,
       icon: Clock,
       color: 'bg-red-500',
       bgColor: 'bg-red-50',
-    },
-    {
-      label: '活跃预警',
-      value: dashboardStats.activeWarnings,
-      icon: AlertTriangle,
-      color: 'bg-yellow-500',
-      bgColor: 'bg-yellow-50',
     },
   ];
 
@@ -103,7 +120,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, index) => (
+        {statCards.map((stat, index) => (
           <div key={index} className="card p-5 card-hover">
             <div className="flex items-start justify-between">
               <div>
@@ -118,8 +135,8 @@ export default function Dashboard() {
             </div>
             <div className="mt-4 flex items-center text-sm">
               <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-              <span className="text-green-600 font-medium">+12%</span>
-              <span className="text-gray-400 ml-2">较昨日</span>
+              <span className="text-green-600 font-medium">实时计算</span>
+              <span className="text-gray-400 ml-2">基于真实记录</span>
             </div>
           </div>
         ))}
@@ -137,7 +154,7 @@ export default function Dashboard() {
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={dashboardStats.inspectionTrend}>
+              <LineChart data={stats.inspectionTrend}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="date" stroke="#9ca3af" fontSize={12} />
                 <YAxis stroke="#9ca3af" fontSize={12} />
@@ -167,7 +184,7 @@ export default function Dashboard() {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={dashboardStats.violationTypeDistribution}
+                  data={stats.violationTypeDistribution}
                   cx="50%"
                   cy="50%"
                   innerRadius={50}
@@ -175,7 +192,7 @@ export default function Dashboard() {
                   paddingAngle={5}
                   dataKey="count"
                 >
-                  {dashboardStats.violationTypeDistribution.map((entry, index) => (
+                  {stats.violationTypeDistribution.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
@@ -184,7 +201,7 @@ export default function Dashboard() {
             </ResponsiveContainer>
           </div>
           <div className="mt-4 space-y-2">
-            {dashboardStats.violationTypeDistribution.map((item, index) => (
+            {stats.violationTypeDistribution.map((item, index) => (
               <div key={index} className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2">
                   <div
@@ -214,7 +231,7 @@ export default function Dashboard() {
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
-                data={dashboardStats.topViolationStalls}
+                data={stats.topViolationStalls}
                 layout="vertical"
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -250,35 +267,41 @@ export default function Dashboard() {
             </button>
           </div>
           <div className="space-y-3">
-            {recentViolations.map((violation) => (
-              <div
-                key={violation.id}
-                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-                onClick={() => navigate('/violations')}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center border border-gray-100">
-                    <AlertTriangle className="w-5 h-5 text-orange-500" />
+            {recentViolations.length > 0 ? (
+              recentViolations.map((violation) => (
+                <div
+                  key={violation.id}
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                  onClick={() => navigate('/violations')}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center border border-gray-100">
+                      <AlertTriangle className="w-5 h-5 text-orange-500" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900 text-sm">
+                        {violation.stallName}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {getViolationTypeLabel(violation.violationType)}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-gray-900 text-sm">
-                      {violation.stallName}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {getViolationTypeLabel(violation.violationType)}
+                  <div className="text-right">
+                    <span className={getViolationStatusBadge(violation.status)}>
+                      {getViolationStatusLabel(violation.status)}
+                    </span>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {violation.createdAt.split(' ')[0]}
                     </p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <span className={getViolationStatusBadge(violation.status)}>
-                    {getViolationStatusLabel(violation.status)}
-                  </span>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {violation.createdAt.split(' ')[0]}
-                  </p>
-                </div>
+              ))
+            ) : (
+              <div className="h-32 flex items-center justify-center text-gray-400 text-sm">
+                暂无违规记录
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>

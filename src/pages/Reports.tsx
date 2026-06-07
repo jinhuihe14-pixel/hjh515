@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   BarChart,
   Bar,
@@ -7,8 +7,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  LineChart,
-  Line,
   PieChart,
   Pie,
   Cell,
@@ -21,51 +19,139 @@ import {
   TrendingUp,
   FileText,
   BarChart3,
-  PieChart as PieChartIcon,
+  CheckCircle,
   Activity,
 } from 'lucide-react';
-import { mockMonthlyReport } from '@/mock/data';
+import { useInspectionStore } from '@/stores/useInspectionStore';
 
-const COLORS = ['#22c55e', '#f97316', '#dc2626', '#8b5cf6', '#06b6d4'];
-
-const violationTrendData = [
-  { month: '1月', 腐烂变质: 18, 缺斤短两: 8, 其他: 5 },
-  { month: '2月', 腐烂变质: 22, 缺斤短两: 6, 其他: 4 },
-  { month: '3月', 腐烂变质: 15, 缺斤短两: 10, 其他: 6 },
-  { month: '4月', 腐烂变质: 28, 缺斤短两: 12, 其他: 3 },
-  { month: '5月', 腐烂变质: 25, 缺斤短两: 9, 其他: 7 },
-  { month: '6月', 腐烂变质: 15, 缺斤短两: 5, 其他: 3 },
-];
-
-const categoryLossData = mockMonthlyReport.categoryLoss.map((item) => ({
-  name: item.category,
-  value: item.lossCount,
-}));
-
-const stallComplianceData = mockMonthlyReport.stallCompliance.map((item) => ({
-  name: item.name,
-  合规率: item.complianceRate,
-}));
-
-const inspectionTrendData = [
-  { date: '6/1', 巡检数: 28, 违规数: 3 },
-  { date: '6/2', 巡检数: 32, 违规数: 5 },
-  { date: '6/3', 巡检数: 29, 违规数: 2 },
-  { date: '6/4', 巡检数: 35, 违规数: 4 },
-  { date: '6/5', 巡检数: 32, 违规数: 3 },
-  { date: '6/6', 巡检数: 30, 违规数: 2 },
-  { date: '6/7', 巡检数: 34, 违规数: 1 },
-];
+const COLORS = ['#dc2626', '#f97316', '#8b5cf6', '#22c55e', '#06b6d4'];
 
 export default function Reports() {
-  const [selectedPeriod, setSelectedPeriod] = useState('month');
+  const [selectedPeriod, setSelectedPeriod] = useState('week');
+
+  const inspections = useInspectionStore((s) => s.inspections);
+  const violations = useInspectionStore((s) => s.violations);
+  const weighings = useInspectionStore((s) => s.weighings);
+  const stalls = useInspectionStore((s) => s.stalls);
+  const getMonthlyReport = useInspectionStore((s) => s.getMonthlyReport);
+  const getViolationTypeDistribution = useInspectionStore(
+    (s) => s.getViolationTypeDistribution
+  );
+  const getComplianceRate = useInspectionStore((s) => s.getComplianceRate);
+  const getResolvedRate = useInspectionStore((s) => s.getResolvedRate);
+  const getTotalInspections = useInspectionStore((s) => s.getTotalInspections);
+  const getTotalViolations = useInspectionStore((s) => s.getTotalViolations);
+  const getCategoryLoss = useInspectionStore((s) => s.getCategoryLoss);
+  const getStallCompliance = useInspectionStore((s) => s.getStallCompliance);
+
+  const report = useMemo(() => getMonthlyReport(), [
+    inspections,
+    violations,
+    weighings,
+    stalls,
+    getMonthlyReport,
+  ]);
+
+  const violationTypeData = useMemo(() => getViolationTypeDistribution(), [
+    violations,
+    getViolationTypeDistribution,
+  ]);
+
+  const complianceRate = useMemo(
+    () => parseFloat(getComplianceRate().toFixed(1)),
+    [inspections, violations, weighings, getComplianceRate]
+  );
+
+  const resolvedRate = useMemo(
+    () => parseFloat(getResolvedRate().toFixed(1)),
+    [violations, getResolvedRate]
+  );
+
+  const totalInspections = useMemo(() => getTotalInspections(), [
+    inspections,
+    weighings,
+    getTotalInspections,
+  ]);
+
+  const totalViolations = useMemo(() => getTotalViolations(), [
+    violations,
+    getTotalViolations,
+  ]);
+
+  const categoryLossData = useMemo(() => getCategoryLoss(), [
+    inspections,
+    violations,
+    getCategoryLoss,
+  ]);
+
+  const stallComplianceData = useMemo(() => getStallCompliance(), [
+    inspections,
+    violations,
+    weighings,
+    stalls,
+    getStallCompliance,
+  ]);
+
+  const trendData = useMemo(() => {
+    const days = 7;
+    const dayData: Record<
+      string,
+      { date: string; 巡检数: number; 违规数: number }
+    > = {};
+
+    const today = new Date();
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const key = `${d.getMonth() + 1}/${d.getDate()}`;
+      dayData[key] = { date: key, 巡检数: 0, 违规数: 0 };
+    }
+
+    const parseDate = (dateStr: string): Date => {
+      const cleaned = dateStr.replace(/\//g, '-');
+      const d = new Date(cleaned);
+      return isNaN(d.getTime()) ? new Date() : d;
+    };
+
+    const formatKey = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
+
+    [...inspections.map((i) => i.inspectionTime), ...weighings.map((w) => w.recordTime)].forEach(
+      (timeStr) => {
+        const d = parseDate(timeStr);
+        const key = formatKey(d);
+        if (key in dayData) {
+          dayData[key].巡检数++;
+        }
+      }
+    );
+
+    violations.forEach((v) => {
+      const d = parseDate(v.createdAt);
+      const key = formatKey(d);
+      if (key in dayData) {
+        dayData[key].违规数++;
+      }
+    });
+
+    return Object.values(dayData);
+  }, [inspections, violations, weighings]);
+
+  const categoryLossPieData = categoryLossData.map((item) => ({
+    name: item.category,
+    value: item.lossCount,
+  }));
+
+  const stallComplianceChartData = stallComplianceData.map((item) => ({
+    name: item.name,
+    合规率: parseFloat(item.complianceRate.toFixed(1)),
+  }));
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-xl font-semibold text-gray-900">数据报表</h2>
-          <p className="text-gray-500 text-sm mt-1">{mockMonthlyReport.month}数据汇总</p>
+          <p className="text-gray-500 text-sm mt-1">{report.month}数据汇总</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
@@ -96,7 +182,9 @@ export default function Reports() {
             </div>
             <div>
               <p className="text-sm text-gray-500">总巡检次数</p>
-              <p className="text-2xl font-bold text-gray-900">{mockMonthlyReport.totalInspections}</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {totalInspections}
+              </p>
             </div>
           </div>
         </div>
@@ -107,18 +195,22 @@ export default function Reports() {
             </div>
             <div>
               <p className="text-sm text-gray-500">违规总数</p>
-              <p className="text-2xl font-bold text-gray-900">{mockMonthlyReport.totalViolations}</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {totalViolations}
+              </p>
             </div>
           </div>
         </div>
         <div className="card p-5">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-              <TrendingUp className="w-6 h-6 text-green-600" />
+              <CheckCircle className="w-6 h-6 text-green-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">违规解决率</p>
-              <p className="text-2xl font-bold text-gray-900">{mockMonthlyReport.resolvedRate}%</p>
+              <p className="text-sm text-gray-500">合规率</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {complianceRate}%
+              </p>
             </div>
           </div>
         </div>
@@ -128,8 +220,10 @@ export default function Reports() {
               <Activity className="w-6 h-6 text-blue-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">摊位总数</p>
-              <p className="text-2xl font-bold text-gray-900">6</p>
+              <p className="text-sm text-gray-500">违规解决率</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {resolvedRate}%
+              </p>
             </div>
           </div>
         </div>
@@ -140,7 +234,7 @@ export default function Reports() {
           <h3 className="font-semibold text-gray-900 mb-4">巡检与违规趋势</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={inspectionTrendData}>
+              <AreaChart data={trendData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="date" stroke="#9ca3af" fontSize={12} />
                 <YAxis stroke="#9ca3af" fontSize={12} />
@@ -179,16 +273,19 @@ export default function Reports() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={categoryLossData}
+                    data={violationTypeData}
                     cx="50%"
                     cy="50%"
                     innerRadius={60}
                     outerRadius={100}
                     paddingAngle={5}
-                    dataKey="value"
+                    dataKey="count"
                   >
-                    {categoryLossData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    {violationTypeData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={COLORS[index % COLORS.length]}
+                      />
                     ))}
                   </Pie>
                   <Tooltip />
@@ -196,14 +293,16 @@ export default function Reports() {
               </ResponsiveContainer>
             </div>
             <div className="space-y-2 ml-4">
-              {categoryLossData.map((item, index) => (
+              {violationTypeData.map((item, index) => (
                 <div key={index} className="flex items-center gap-2">
                   <div
                     className="w-3 h-3 rounded-full"
                     style={{ backgroundColor: COLORS[index % COLORS.length] }}
                   />
-                  <span className="text-sm text-gray-600">{item.name}</span>
-                  <span className="text-sm font-medium text-gray-900">{item.value}</span>
+                  <span className="text-sm text-gray-600">{item.type}</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {item.count}
+                  </span>
                 </div>
               ))}
             </div>
@@ -212,35 +311,17 @@ export default function Reports() {
       </div>
 
       <div className="card p-6">
-        <h3 className="font-semibold text-gray-900 mb-4">月度违规趋势</h3>
-        <div className="h-72">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={violationTrendData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="month" stroke="#9ca3af" fontSize={12} />
-              <YAxis stroke="#9ca3af" fontSize={12} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: '#fff',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                }}
-              />
-              <Bar dataKey="腐烂变质" fill="#dc2626" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="缺斤短两" fill="#f97316" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="其他" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      <div className="card p-6">
         <h3 className="font-semibold text-gray-900 mb-4">摊位合规率排名</h3>
         <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={stallComplianceData} layout="vertical">
+            <BarChart data={stallComplianceChartData} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis type="number" domain={[0, 100]} stroke="#9ca3af" fontSize={12} />
+              <XAxis
+                type="number"
+                domain={[0, 100]}
+                stroke="#9ca3af"
+                fontSize={12}
+              />
               <YAxis
                 dataKey="name"
                 type="category"
@@ -270,52 +351,93 @@ export default function Reports() {
       <div className="card p-6">
         <h3 className="font-semibold text-gray-900 mb-4">变质损耗高发品类</h3>
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-100">
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">排名</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">品类</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">损耗次数</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">占比</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">趋势</th>
-              </tr>
-            </thead>
-            <tbody>
-              {categoryLossData.map((item, index) => {
-                const total = categoryLossData.reduce((sum, i) => sum + i.value, 0);
-                const percentage = ((item.value / total) * 100).toFixed(1);
-                return (
-                  <tr key={index} className="border-b border-gray-50 hover:bg-gray-50">
-                    <td className="py-3 px-4">
-                      <span
-                        className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium ${index < 3 ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-600'}`}
-                      >
-                        {index + 1}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 font-medium text-gray-900">{item.name}</td>
-                    <td className="py-3 px-4 text-gray-600">{item.value}次</td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-primary-500 rounded-full"
-                            style={{ width: `${percentage}%` }}
-                          />
+          {categoryLossData.length > 0 ? (
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">
+                    排名
+                  </th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">
+                    品类
+                  </th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">
+                    损耗次数
+                  </th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">
+                    占比
+                  </th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">
+                    趋势
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {categoryLossData.map((item, index) => {
+                  const total = categoryLossData.reduce(
+                    (sum, i) => sum + i.lossCount,
+                    0
+                  );
+                  const percentage = (
+                    (item.lossCount / total) *
+                    100
+                  ).toFixed(1);
+                  return (
+                    <tr
+                      key={index}
+                      className="border-b border-gray-50 hover:bg-gray-50"
+                    >
+                      <td className="py-3 px-4">
+                        <span
+                          className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium ${
+                            index < 3
+                              ? 'bg-primary-100 text-primary-700'
+                              : 'bg-gray-100 text-gray-600'
+                          }`}
+                        >
+                          {index + 1}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 font-medium text-gray-900">
+                        {item.category}
+                      </td>
+                      <td className="py-3 px-4 text-gray-600">
+                        {item.lossCount}次
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-primary-500 rounded-full"
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                          <span className="text-sm text-gray-600">
+                            {percentage}%
+                          </span>
                         </div>
-                        <span className="text-sm text-gray-600">{percentage}%</span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className={`text-sm ${index % 2 === 0 ? 'text-red-500' : 'text-green-500'}`}>
-                        {index % 2 === 0 ? '↑ 上升' : '↓ 下降'}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span
+                          className={`text-sm ${
+                            index % 2 === 0
+                              ? 'text-red-500'
+                              : 'text-green-500'
+                          }`}
+                        >
+                          {index % 2 === 0 ? '↑ 上升' : '↓ 下降'}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          ) : (
+            <div className="py-12 text-center text-gray-500">
+              暂无变质损耗数据
+            </div>
+          )}
         </div>
       </div>
     </div>
