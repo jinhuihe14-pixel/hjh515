@@ -1,5 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { useEffect } from "react";
 import { useUserStore } from "@/stores/useUserStore";
+import { useInspectionStore } from "@/stores/useInspectionStore";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import Inspection from "@/pages/Inspection";
@@ -16,6 +18,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  const recalculateAllWarnings = useInspectionStore((s) => s.recalculateAllWarnings);
+
+  useEffect(() => {
+    recalculateAllWarnings();
+  }, [recalculateAllWarnings]);
+
   return (
     <Router>
       <Routes>

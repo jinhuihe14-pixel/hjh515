@@ -6,6 +6,7 @@ import type {
   WeighingRecord,
   Stall,
   Warning,
+  WarningLevel,
   RecognitionResult,
   DashboardStats,
   MonthlyReport,
@@ -40,10 +41,13 @@ interface InspectionState {
     remark?: string
   ) => void;
   acknowledgeWarning: (id: string) => void;
+  updateWarningForStall: (stallId: string, stallName: string) => void;
+  recalculateAllWarnings: () => void;
   getViolationsByStatus: (
     status?: ViolationRecord['status']
   ) => ViolationRecord[];
   getStallById: (id: string) => Stall | undefined;
+  getStallViolationCountIn7Days: (stallId: string) => number;
 
   getDashboardStats: () => DashboardStats;
   getMonthlyReport: () => MonthlyReport;
@@ -67,6 +71,23 @@ const parseDate = (dateStr: string): Date => {
   return new Date();
 };
 
+const getWarningLevelFromCount = (count: number): WarningLevel | null => {
+  if (count >= 5) return 'high';
+  if (count >= 3) return 'medium';
+  if (count >= 1) return 'low';
+  return null;
+};
+
+const WARNING_LEVEL_ORDER: Record<WarningLevel, number> = {
+  low: 1,
+  medium: 2,
+  high: 3,
+};
+
+const isHigherLevel = (newLevel: WarningLevel, oldLevel: WarningLevel): boolean => {
+  return WARNING_LEVEL_ORDER[newLevel] > WARNING_LEVEL_ORDER[oldLevel];
+};
+
 const formatDateKey = (date: Date): string => {
   const m = date.getMonth() + 1;
   const d = date.getDate();
@@ -87,10 +108,13 @@ export const useInspectionStore = create<InspectionState>()(
           inspections: [inspection, ...state.inspections],
         })),
 
-      addViolation: (violation) =>
-        set((state) => ({
-          violations: [violation, ...state.violations],
-        })),
+      addViolation: (violation) => {
+        set((state) => {
+          const newViolations = [violation, ...state.violations];
+          return { violations: newViolations };
+        });
+        get().updateWarningForStall(violation.stallId, violation.stallName);
+      },
 
       addWeighing: (weighing) =>
         set((state) => ({
@@ -120,6 +144,134 @@ export const useInspectionStore = create<InspectionState>()(
             w.id === id ? { ...w, isAcknowledged: true } : w
           ),
         })),
+
+      getStallViolationCountIn7Days: (stallId) => {
+        const state = get();
+        const now = new Date();
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(now.getDate() - 7);
+
+        return state.violations.filter((v) => {
+          if (v.stallId !== stallId) return false;
+          const violationDate = parseDate(v.createdAt);
+          return violationDate >= sevenDaysAgo && violationDate <= now;
+        }).length;
+      },
+
+      updateWarningForStall: (stallId, stallName) => {
+        const state = get();
+        const violationCount = state.getStallViolationCountIn7Days(stallId);
+        const warningLevel = getWarningLevelFromCount(violationCount);
+
+        const existingWarning = state.warnings.find(
+          (w) => w.stallId === stallId && w.warningType === 'high_violation'
+        );
+
+        if (warningLevel === null) {
+          if (existingWarning) {
+            set((state) => ({
+              warnings: state.warnings.filter((w) => w.id !== existingWarning.id),
+            }));
+          }
+          return;
+        }
+
+        if (existingWarning) {
+          const levelUpgraded = isHigherLevel(warningLevel, existingWarning.warningLevel);
+          set((state) => ({
+            warnings: state.warnings.map((w) =>
+              w.id === existingWarning.id
+                ? {
+                    ...w,
+                    violationCount,
+                    warningLevel,
+                    isAcknowledged: levelUpgraded ? false : w.isAcknowledged,
+                  }
+                : w
+            ),
+          }));
+        } else {
+          const newWarning: Warning = {
+            id: `warn-${Date.now()}-${stallId}`,
+            stallId,
+            stallName,
+            warningType: 'high_violation',
+            warningLevel,
+            violationCount,
+            createdAt: new Date().toLocaleString('zh-CN'),
+            isAcknowledged: false,
+          };
+          set((state) => ({
+            warnings: [newWarning, ...state.warnings],
+          }));
+        }
+      },
+
+      recalculateAllWarnings: () => {
+        const state = get();
+        const stallViolationCounts: Record<string, { name: string; count: number }> = {};
+
+        state.violations.forEach((v) => {
+          if (!stallViolationCounts[v.stallId]) {
+            stallViolationCounts[v.stallId] = { name: v.stallName, count: 0 };
+          }
+        });
+
+        const now = new Date();
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(now.getDate() - 7);
+
+        state.violations.forEach((v) => {
+          const violationDate = parseDate(v.createdAt);
+          if (violationDate >= sevenDaysAgo && violationDate <= now) {
+            if (stallViolationCounts[v.stallId]) {
+              stallViolationCounts[v.stallId].count++;
+            }
+          }
+        });
+
+        const existingHighViolationWarnings = state.warnings.filter(
+          (w) => w.warningType === 'high_violation'
+        );
+        const otherWarnings = state.warnings.filter(
+          (w) => w.warningType !== 'high_violation'
+        );
+
+        const newWarnings: Warning[] = [];
+
+        Object.entries(stallViolationCounts).forEach(([stallId, info]) => {
+          const warningLevel = getWarningLevelFromCount(info.count);
+          if (warningLevel) {
+            const existing = existingHighViolationWarnings.find(
+              (w) => w.stallId === stallId
+            );
+            if (existing) {
+              const levelUpgraded = isHigherLevel(warningLevel, existing.warningLevel);
+              newWarnings.push({
+                ...existing,
+                violationCount: info.count,
+                warningLevel,
+                isAcknowledged: levelUpgraded ? false : existing.isAcknowledged,
+              });
+            } else {
+              newWarnings.push({
+                id: `warn-${Date.now()}-${stallId}`,
+                stallId,
+                stallName: info.name,
+                warningType: 'high_violation',
+                warningLevel,
+                violationCount: info.count,
+                createdAt: new Date().toLocaleString('zh-CN'),
+                isAcknowledged: false,
+              });
+            }
+          }
+        });
+
+        set({
+          warnings: [...newWarnings, ...otherWarnings],
+        });
+      },
 
       getViolationsByStatus: (status) => {
         const state = get();
